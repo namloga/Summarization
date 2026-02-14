@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Суммаризация отзывов</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div id="tabText" class="tab active" onclick="switchTab('text')">📄 Текст</div>
+            <div id="tabFile" class="tab" onclick="switchTab('file')">📁 Файл</div>
+        </div>
+        
+        <!-- Main -->
+        <div class="main">
+            
+            <div class="controls">
+                <label><b>Длина</b></label>
+                <select id="length" onchange="updateLengthCheck()">
+                    <option value="short">Короткий</option>
+                    <option value="medium" selected>Средний</option>
+                    <option value="long">Длинный</option>
+                </select>
+            </div>
+            
+            <div class="panels">
+                
+                <!-- LEFT PANEL -->
+                <div class="panel" id="leftPanel">
+                    
+                    <div id="clearBtn" class="clear-btn hidden" onclick="clearInput()">&times;</div>
+                    
+                    <!-- Interface 1: TEXT -->
+                    <textarea id="inputText" placeholder="Введите текст отзывов..."></textarea>
+                    
+                    <!-- Interface 2: FILE UPLOAD -->
+                    <div class="upload-box hidden" id="uploadBox" onclick="document.getElementById('fileInput').click()">
+                        <div>
+                            <div style="font-size:40px">📄</div>
+                            Загрузить файл
+                        </div>
+                    </div>
+                    <input type="file" id="fileInput" class="hidden" accept=".csv" />
+
+                    <!-- Nút Load Mock CSV -->
+                    <button id="mockBtn">Загрузить Mock CSV</button>
+                    
+                    <div class="footer">
+                        <span id="inputCount">Слова: 0</span>
+                        <button onclick="startProcessing()">Суммаризовать</button>
+                    </div>
+                </div>
+                
+                <!-- RIGHT PANEL -->
+                <div class="panel">
+                    <textarea id="outputText" placeholder="Результат суммаризации..." readonly></textarea>
+                    
+                    <div class="footer">
+                        <span id="outputCount">Слова: 0</span>
+                        <div>
+                            <button onclick="copyResult()">Копировать</button>
+                            <button onclick="downloadResult()">Скачать</button>
+                        </div>
+                    </div>
+                    
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        Loading
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PapaParse để đọc CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- Script chính -->
+    <script src="script.js"></script>
+</body>
+</html>

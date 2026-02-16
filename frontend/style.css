@@ -1,29 +1,9 @@
 * { box-sizing: border-box; font-family: Arial, sans-serif; }
-body { margin: 0; background: #f3f4f6; }
+body { margin: 0; background: linear-gradient(135deg, #e0f2ff, #f8fbff); }
 
 .app { 
     display: flex;
     height: 100vh; }
-
-.sidebar {
-    width: 180px;
-    background: #fff;
-    border-right: 1px solid #ddd;
-    padding: 12px;
-}
-
-.tab {
-    padding: 10px;
-    margin-bottom: 8px;
-    border: 1px dashed #bcd;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.tab.active {
-    background: #e6f0f0;
-    border-style: solid;
-}
 
 .main {
     flex: 1;
@@ -31,20 +11,6 @@ body { margin: 0; background: #f3f4f6; }
     display: flex;
     flex-direction:column;
     gap: 12px;
-}
-
-.controls {
-    display: flex;
-    gap: 8px;
-    align-items: center; }
-
-/* highlight selected length */
-#length.highlight {
-    background: #e6f0ff;
-    border: 1px solid #6aa0ff;
-    color: #1a3d8f;
-    border-radius: 6px;
-    padding: 4px 6px;
 }
 
 .panels {
@@ -55,13 +21,14 @@ body { margin: 0; background: #f3f4f6; }
 
 .panel {
     background: #fff;
-    border-radius: 10px;
-    border: 1px solid #ddd;
-    padding: 12px;
+    border-radius: 16px;
+    border: none;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     position: relative;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
 textarea {
@@ -70,6 +37,10 @@ textarea {
     border: none;
     resize: none;
     outline: none;
+    background: #f9fbff;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 14px;
 }
 
 .footer {
@@ -82,8 +53,8 @@ textarea {
 button {
     padding: 8px 14px;
     border-radius: 8px;
-    border: 1px solid #ccc;
-    background: #f8f8f8;
+    border: 1px solid #92d7e4;
+    background: #ddf4f8;
     cursor: pointer;
 }
 
@@ -154,4 +125,16 @@ button {
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+#uploadBtn {
+    margin-bottom: 20px;
+}
+
+.page-title {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 600;
+    color: #1a3d8f;
+    margin-bottom: 10px;
 }

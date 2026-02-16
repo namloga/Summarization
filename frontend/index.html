@@ -8,24 +8,12 @@
 </head>
 <body>
     <div class="app">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div id="tabText" class="tab active" onclick="switchTab('text')">📄 Текст</div>
-            <div id="tabFile" class="tab" onclick="switchTab('file')">📁 Файл</div>
-        </div>
         
         <!-- Main -->
         <div class="main">
-            
-            <div class="controls">
-                <label><b>Длина</b></label>
-                <select id="length" onchange="updateLengthCheck()">
-                    <option value="short">Короткий</option>
-                    <option value="medium" selected>Средний</option>
-                    <option value="long">Длинный</option>
-                </select>
-            </div>
-            
+
+            <h1 class="page-title">Суммаризатор текста</h1>
+
             <div class="panels">
                 
                 <!-- LEFT PANEL -->
@@ -34,7 +22,7 @@
                     <div id="clearBtn" class="clear-btn hidden" onclick="clearInput()">&times;</div>
                     
                     <!-- Interface 1: TEXT -->
-                    <textarea id="inputText" placeholder="Введите текст отзывов..."></textarea>
+                    <textarea id="inputText" placeholder="Введите..."></textarea>
                     
                     <!-- Interface 2: FILE UPLOAD -->
                     <div class="upload-box hidden" id="uploadBox" onclick="document.getElementById('fileInput').click()">
@@ -46,7 +34,8 @@
                     <input type="file" id="fileInput" class="hidden" accept=".csv" />
 
                     <!-- Nút Load Mock CSV -->
-                    <button id="mockBtn">Загрузить Mock CSV</button>
+                    <button id="uploadBtn">Загрузить CSV</button>
+                    <input type="file" id="fileInput" class="hidden" accept=".csv" />
                     
                     <div class="footer">
                         <span id="inputCount">Слова: 0</span>

@@ -30,7 +30,6 @@ app.add_middleware(
 
 @app.exception_handler(FastAPIHTTPException)
 async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
-    """Нормализует HTTP-ошибки в единый формат для frontend."""
     detail = exc.detail
     if isinstance(detail, dict) and "code" in detail and "message" in detail:
         err = ErrorResponse(success=False, error=ErrorDetail(**detail))
@@ -48,7 +47,6 @@ async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Ловит любые необработанные исключения и возвращает стандартную JSON-ошибку."""
     logger.exception("Необработанное исключение: %s", exc)
     return JSONResponse(
         status_code=500,
@@ -68,7 +66,6 @@ app.include_router(router, prefix="", tags=["summarization"])
 
 @app.get("/")
 def root():
-    """Информация о сервисе."""
     return {
         "service": "API суммаризации",
         "docs": "/docs",

@@ -1,5 +1,3 @@
-// Конфигурация API
-// Для деплоя: измените BASE_URL на URL backend (например: https://your-app.onrender.com)
 const API_CONFIG = {
     BASE_URL: (typeof window !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL : 'http://localhost:8000',
     ENDPOINTS: {

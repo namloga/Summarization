@@ -1,13 +1,8 @@
-"""
-Роуты и схемы (request/response) для API: /summarize, /summarize-file, /health.
-"""
-
 import io
 import logging
 import os
 from pathlib import Path
 from typing import Any
-
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
@@ -24,7 +19,6 @@ def _env_int(name: str, default: int, min_val: int, max_val: int) -> int:
 
 MAX_FILE_ITEMS = _env_int("SUMMARIZATION_MAX_FILE_ITEMS", 2000, 1, 20_000)
 
-# ---- Schemas (Pydantic) ----
 class SummarizeRequest(BaseModel):
     text: str | None = Field(None, description="Текст для суммаризации")
     texts: list[str] | None = Field(None, description="Список текстов (если задан — приоритетнее)")
@@ -79,7 +73,6 @@ class ErrorResponse(BaseModel):
     error: ErrorDetail = Field(..., description="Данные об ошибке")
 
 
-# ---- Route handlers ----
 def _get_pipeline():
     from src.summarizer.pipeline import get_pipeline
     return get_pipeline()
@@ -97,11 +90,11 @@ def summarize(body: SummarizeRequest):
     texts = body.get_texts()
     if not texts:
         raise HTTPException(
-            status_code=400,
-            detail=ErrorDetail(
-                code="EMPTY_INPUT",
-                message="Нужно передать 'text' или 'texts' (не пустые).",
-                detail=None,
+            status_code = 400,
+            detail = ErrorDetail(
+                code = "EMPTY_INPUT",
+                message = "Нужно передать 'text' или 'texts' (не пустые).",
+                detail = None,
             ).model_dump(),
         )
     try:
@@ -115,11 +108,11 @@ def summarize(body: SummarizeRequest):
     except Exception as e:
         logger.exception("Ошибка суммаризации: %s", e)
         raise HTTPException(
-            status_code=500,
-            detail=ErrorDetail(
-                code="SUMMARIZATION_ERROR",
-                message="Ошибка при суммаризации. Пожалуйста, попробуйте ещё раз.",
-                detail=str(e),
+            status_code = 500,
+            detail = ErrorDetail(
+                code = "SUMMARIZATION_ERROR",
+                message = "Ошибка при суммаризации. Пожалуйста, попробуйте ещё раз.",
+                detail = str(e),
             ).model_dump(),
         )
 
@@ -134,11 +127,11 @@ async def summarize_file(
     ext = Path(filename).suffix.lower()
     if ext not in (".csv", ".json", ".jsonl"):
         raise HTTPException(
-            status_code=400,
-            detail=ErrorDetail(
-                code="UNSUPPORTED_FORMAT",
-                message="Поддерживаются только файлы .csv или .json",
-                detail={"filename": filename},
+            status_code = 400,
+            detail = ErrorDetail(
+                code = "UNSUPPORTED_FORMAT",
+                message = "Поддерживаются только файлы .csv или .json",
+                detail = {"filename": filename},
             ).model_dump(),
         )
 
@@ -147,18 +140,18 @@ async def summarize_file(
     except Exception as e:
         logger.exception("Ошибка чтения файла: %s", e)
         raise HTTPException(
-            status_code=400,
-            detail=ErrorDetail(
-                code="FILE_READ_ERROR",
-                message="Не удалось прочитать файл.",
-                detail=str(e),
+            status_code = 400,
+            detail = ErrorDetail(
+                code = "FILE_READ_ERROR",
+                message = "Не удалось прочитать файл.",
+                detail = str(e),
             ).model_dump(),
         )
 
     if not content:
         raise HTTPException(
-            status_code=400,
-            detail=ErrorDetail(code="EMPTY_FILE", message="Пустой файл.", detail=None).model_dump(),
+            status_code = 400,
+            detail = ErrorDetail(code="EMPTY_FILE", message="Пустой файл.", detail=None).model_dump(),
         )
 
     try:
@@ -167,41 +160,41 @@ async def summarize_file(
         buffer = io.BytesIO(content)
         texts = extract_texts_from_file(
             buffer,
-            filename=filename,
-            max_rows=MAX_FILE_ITEMS,
+            filename = filename,
+            max_rows = MAX_FILE_ITEMS,
         )
     except ValueError as e:
         raise HTTPException(
-            status_code=400,
-            detail=ErrorDetail(
-                code="INVALID_FILE",
-                message=str(e),
-                detail=None,
+            status_code = 400,
+            detail = ErrorDetail(
+                code = "INVALID_FILE",
+                message = str(e),
+                detail = None,
             ).model_dump(),
         )
     except Exception as e:
         logger.exception("Ошибка разбора файла: %s", e)
         raise HTTPException(
-            status_code=400,
-            detail=ErrorDetail(
-                code="PARSE_ERROR",
-                message="Неверный формат файла или отсутствует колонка text/content/review.",
-                detail=str(e),
+            status_code = 400,
+            detail = ErrorDetail(
+                code = "PARSE_ERROR",
+                message = "Неверный формат файла или отсутствует колонка text/content/review.",
+                detail = str(e),
             ).model_dump(),
         )
 
     total_extracted = len(texts)
     if total_extracted == 0:
         return SummarizeFileResponse(
-            success=True,
-            summaries=[],
-            stats=SummarizeFileStats(
-                total_rows=0,
-                extracted_texts=0,
-                summarized=0,
-                skipped=0,
+            success = True,
+            summaries = [],
+            stats = SummarizeFileStats(
+                total_rows = 0,
+                extracted_texts = 0,
+                summarized = 0,
+                skipped = 0,
             ),
-            filename=filename,
+            filename = filename,
         )
 
     try:
@@ -214,40 +207,39 @@ async def summarize_file(
                 SummarizeItemResponse(summary=summary, original_length=len(combined))
             ]
             return SummarizeFileResponse(
-                success=True,
-                summaries=items,
-                stats=SummarizeFileStats(
-                    total_rows=total_extracted,
-                    extracted_texts=total_extracted,
-                    summarized=1 if summary else 0,
-                    skipped=0,
+                success = True,
+                summaries = items,
+                stats = SummarizeFileStats(
+                    total_rows = total_extracted,
+                    extracted_texts = total_extracted,
+                    summarized = 1 if summary else 0,
+                    skipped = 0,
                 ),
                 filename=filename,
             )
-        # По умолчанию: суммаризация построчно
         summaries = pipeline.summarize_batch(texts, do_chunk=True)
         items = [
             SummarizeItemResponse(summary=s, original_length=len(t))
             for t, s in zip(texts, summaries)
         ]
         return SummarizeFileResponse(
-            success=True,
-            summaries=items,
-            stats=SummarizeFileStats(
-                total_rows=total_extracted,
-                extracted_texts=total_extracted,
-                summarized=len([s for s in summaries if s]),
-                skipped=sum(1 for s in summaries if not s),
+            success = True,
+            summaries = items,
+            stats = SummarizeFileStats(
+                total_rows = total_extracted,
+                extracted_texts = total_extracted,
+                summarized = len([s for s in summaries if s]),
+                skipped = sum(1 for s in summaries if not s),
             ),
-            filename=filename,
+            filename = filename,
         )
     except Exception as e:
         logger.exception("Ошибка суммаризации файла: %s", e)
         raise HTTPException(
-            status_code=500,
-            detail=ErrorDetail(
-                code="SUMMARIZATION_ERROR",
-                message="Ошибка при суммаризации содержимого файла.",
-                detail=str(e),
+            status_code = 500,
+            detail = ErrorDetail(
+                code = "SUMMARIZATION_ERROR",
+                message = "Ошибка при суммаризации содержимого файла.",
+                detail = str(e),
             ).model_dump(),
         )

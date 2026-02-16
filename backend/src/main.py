@@ -1,9 +1,3 @@
-"""
-Entrypoint: запуск FastAPI-сервера (uvicorn).
-Запуск из папки backend: python -m src.main
-Production: задайте PORT (и при необходимости RELOAD=0).
-"""
-
 import os
 import uvicorn
 

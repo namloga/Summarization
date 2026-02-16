@@ -1,7 +1,3 @@
-"""
-Pipeline суммаризации: ruT5/T5, chunking для длинного текста, постобработка (dedupe, границы предложений).
-"""
-
 import logging
 import os
 import re
@@ -14,7 +10,6 @@ DEFAULT_MAX_OUTPUT_LENGTH = 160
 DEFAULT_MAX_SOURCE_LENGTH_CHARS = 1500
 DEFAULT_MODEL_NAME = os.getenv("SUMMARIZATION_MODEL", "IlyaGusev/rut5_base_sum_gazeta")
 
-# Единый экземпляр pipeline (ленивая загрузка)
 _pipeline: "SummarizerPipeline | None" = None
 
 
@@ -51,7 +46,6 @@ class SummarizerPipeline:
         self._tokenizer = None
 
     def load(self) -> None:
-        """Ленивая загрузка модели и токенайзера с Hugging Face."""
         if self._model is not None:
             return
         try:
@@ -138,7 +132,6 @@ class SummarizerPipeline:
         return self._chunk_sentences(text)
 
     def _dedupe_sentences_light(self, text: str) -> str:
-        """Удаляет полностью повторяющиеся предложения, сохраняя остальное (режим detail)."""
         if not text or len(text) < 10:
             return text.strip()
         parts = [p.strip() for p in text.split(".") if p.strip()]
@@ -168,7 +161,6 @@ class SummarizerPipeline:
         return s
 
     def _dedupe_summary(self, summary: str) -> str:
-        """Удаляет повторяющиеся фразы/клаузы (для короткой сводки или chunk-режима)."""
         if not summary or len(summary) < 10:
             return summary.strip()
         summary = re.sub(r"\b(\w+)\s+и\s+\1\b", r"\1", summary, flags=re.IGNORECASE)

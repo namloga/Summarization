@@ -1,8 +1,3 @@
-"""
-Загрузка данных из CSV/JSON и извлечение колонки с текстом.
-Включает очистку (нормализация Unicode, пробелы), обработку кодировок и пустых строк.
-"""
-
 import csv
 import io
 import json
@@ -15,19 +10,16 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ---- Очистка текста ----
 TEXT_COLUMN_ALIASES = ("text", "content", "review", "feedback", "comment", "original_text")
 
 
 def normalize_encoding(s: str) -> str:
-    """Нормализует Unicode (NFC)."""
     if not s or not isinstance(s, str):
         return ""
     return unicodedata.normalize("NFC", s.strip())
 
 
 def clean_text(text: str, max_length: int | None = None) -> str:
-    """Очистка: нормализация, сжатие пробелов. Если max_length задан — обрезка по словам."""
     if text is None:
         return ""
     if not isinstance(text, str):
@@ -40,8 +32,6 @@ def clean_text(text: str, max_length: int | None = None) -> str:
         s = s[:max_length].rsplit(maxsplit=1)[0] if s.count(" ") else s[:max_length]
     return s
 
-
-# ---- Лимит размера файла: env SUMMARIZATION_MAX_FILE_MB (по умолчанию 10, максимум 100 MB)
 def _parse_max_file_mb() -> int:
     try:
         v = os.getenv("SUMMARIZATION_MAX_FILE_MB", "10").strip()
@@ -50,12 +40,9 @@ def _parse_max_file_mb() -> int:
     except ValueError:
         return 10
 
-
 MAX_FILE_SIZE_BYTES = _parse_max_file_mb() * 1024 * 1024
 
-
 def detect_text_column(headers: list[str]) -> str | None:
-    """Ищет имя колонки с текстом (text/content/review)."""
     headers_lower = [h.strip().lower() for h in headers if h]
     for alias in TEXT_COLUMN_ALIASES:
         if alias in headers_lower:
@@ -63,14 +50,12 @@ def detect_text_column(headers: list[str]) -> str | None:
             return headers[idx].strip()
     return None
 
-
 def load_csv_texts(
     file_path: str | Path | io.BytesIO,
     text_column: str | None = None,
     encoding: str = "utf-8",
     max_rows: int | None = None,
 ) -> list[str]:
-    """Читает CSV и извлекает колонку с текстом. Если text_column=None — автоопределение. Пустые строки пропускаются."""
     if isinstance(file_path, (str, Path)):
         path = Path(file_path)
         if path.stat().st_size > MAX_FILE_SIZE_BYTES:
@@ -115,7 +100,6 @@ def load_json_texts(
     encoding: str = "utf-8",
     max_items: int | None = None,
 ) -> list[str]:
-    """Читает JSON (массив объектов или {'items': [...]}), извлекает поле с текстом."""
     if isinstance(file_path, (str, Path)):
         path = Path(file_path)
         if path.stat().st_size > MAX_FILE_SIZE_BYTES:
@@ -177,7 +161,6 @@ def extract_texts_from_file(
     text_column: str | None = None,
     max_rows: int | None = None,
 ) -> list[str]:
-    """Автоопределяет CSV/JSON по расширению и вызывает соответствующий loader."""
     name = filename
     if name is None and hasattr(file_path, "name"):
         name = getattr(file_path, "name", "")

@@ -1,15 +1,15 @@
-// =======================
-// Lấy các element cơ bản
 const input = document.getElementById('inputText');
 const output = document.getElementById('outputText');
 const loading = document.getElementById('loading');
 const clearBtn = document.getElementById('clearBtn');
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInput = document.getElementById('fileInput');
 
-// =======================
-// Input text thay đổi
+const API_BASE = window.API_CONFIG?.BASE_URL || 'http://localhost:8000';
+// Количество отзывов из последнего загруженного CSV (для отображения справа)
+window.lastCsvCount = null;
+
 input.addEventListener('input', () => {
-    window.csvData = null;
-
     document.getElementById('inputCount').textContent =
         'Слова: ' + input.value.trim().split(/\s+/).filter(Boolean).length;
     if (input.value.length > 0) {
@@ -24,52 +24,42 @@ function clearInput() {
     input.focus();
 }
 
-// =======================
-// Fetch CSV từ server
-function fetchCSVFromServer(url) {
-    loading.style.display = 'flex';
-    fetch(url)
-        .then(res => {
-            if (!res.ok) throw new Error("Ошибка сети");
-            return res.json(); // server trả JSON dạng [{Product,ID,Original_text},...]
-        })
-        .then(data => {
-            window.csvData = data.map(row => ({
-                product: row.Product,
-                id: row.ID,
-                content: row.Original_text
-            }));
-            input.value = window.csvData.map(r => r.content).join("\n\n");
-            input.dispatchEvent(new Event('input'));
-        })
-        .catch(err => alert("Ошибка fetch: " + err.message))
-        .finally(() => loading.style.display = 'none');
-}
+async function startProcessing() {
+    const text = input.value.trim();
+    if (!text) {
+        alert('Введите текст для суммаризации.');
+        return;
+    }
 
-// =======================
-// Xử lý & xuất output
-function startProcessing() {
     loading.style.display = 'flex';
-    setTimeout(() => {
-        if (window.csvData && window.csvData.length > 0) {
-            // Xử lý file CSV
-            const summarized = window.csvData.map(row => {
-                const shortContent = row.content.slice(0, 150);
-                return `Product: ${row.product}\nID: ${row.id}\nFeedback: ${shortContent}\n`;
-            }).join("\n---\n");
-            output.value = summarized;
-        } else {
-            // Xử lý text bình thường
-            output.value = input.value.slice(0, 150);
+    try {
+        const res = await fetch(`${API_BASE}/summarize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        if (!res.ok) {
+            const errBody = await res.json().catch(() => null);
+            const msg = errBody?.error?.message || 'Ошибка API';
+            throw new Error(msg);
         }
+        const data = await res.json();
+        if (!data.success || !data.summaries || !data.summaries.length) {
+            throw new Error('Пустой результат от API');
+        }
+        output.value = data.summaries[0].summary;
+    } catch (err) {
+        console.error('Ошибка суммаризации:', err);
+        output.value = 'Ошибка: ' + err.message;
+    } finally {
+        const words = output.value.trim().split(/\s+/).filter(Boolean).length;
+        const reviews = window.lastCsvCount || 1;
         document.getElementById('outputCount').textContent =
-            'Слова: ' + output.value.trim().split(/\s+/).filter(Boolean).length;
+            'Слова: ' + words + (window.lastCsvCount ? ` | Отзывов: ${reviews}` : '');
         loading.style.display = 'none';
-    }, 1500);
+    }
 }
 
-// =======================
-// Copy / Download kết quả
 function copyResult() {
     if (!output.value) return;
     navigator.clipboard.writeText(output.value);
@@ -87,37 +77,42 @@ function downloadResult() {
     a.click();
 }
 
-const uploadBtn = document.getElementById('uploadBtn');
-const fileInput = document.getElementById('fileInput');
-
 uploadBtn.addEventListener('click', () => {
     fileInput.click();
 });
 
-fileInput.addEventListener('change', async function () {
+fileInput.addEventListener('change', function () {
     const file = this.files[0];
     if (!file) return;
 
-    loading.style.display = 'flex';
-
-    const formData = new FormData();
-    formData.append("file", file);
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('Пожалуйста, выберите файл CSV.');
+        return;
+    }
 
     try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const data = {
-            summary: "Тест API прошёл успешно."
-        };
-
-        output.value = data.summary;
-
-        document.getElementById('outputCount').textContent =
-            'Слова: ' + output.value.trim().split(/\s+/).filter(Boolean).length;
-
-    } catch (err) {
-        alert("Ошибка: " + err.message);
-    } finally {
-        loading.style.display = 'none';
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (res) => {
+                const rows = res.data || [];
+                const texts = rows
+                    .map(r => {
+                        const content = r.Original_text || r.text || r.content || r.review || '';
+                        if (!content) return '';
+                        const id = r.ID || r.id || '';
+                        return id ? `ID: ${id}\n${content}` : content;
+                    })
+                    .filter(Boolean);
+                if (texts.length) {
+                    input.value = texts.join('\n\n');
+                    input.dispatchEvent(new Event('input'));
+                    // Сохраняем количество отзывов для отображения в сводке
+                    window.lastCsvCount = texts.length;
+                }
+            }
+        });
+    } catch (e) {
+        console.error('Ошибка чтения CSV на фронтенде:', e);
     }
 });

@@ -1,14 +1,8 @@
-"""
-Базовые тесты API: /health, /summarize, /summarize-file.
-Mock pipeline — модель не загружается в тестах.
-"""
-
 import io
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 @pytest.fixture
 def client():
@@ -101,6 +95,7 @@ def test_summarize_file_unsupported_format(client: TestClient):
 def test_summarize_file_csv_ok(mock_get_pipeline, client: TestClient):
     mock_pipe = mock_get_pipeline.return_value
     mock_pipe.summarize_batch.return_value = ["Сводка 1"]
+    mock_pipe.summarize_one.return_value = "Сводка 1"
 
     csv_content = b"text\nTekst dlya summarizatsii."
     r = client.post(
@@ -123,7 +118,7 @@ def test_summarize_file_json_ok(mock_get_pipeline, client: TestClient):
 
     json_content = b'[{"text": "Pervyy."}, {"content": "Vtoroy."}]'
     r = client.post(
-        "/summarize-file",
+        "/summarize-file?combine=false",
         files={"file": ("data.json", io.BytesIO(json_content), "application/json")},
     )
     assert r.status_code == 200

@@ -1,0 +1,18 @@
+# Summarization Backend - dependencies
+# Python >= 3.10
+
+# API
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Validation & env
+pydantic>=2.5.0
+python-multipart>=0.0.6
+
+# ML / Summarization
+transformers>=4.36.0
+torch>=2.0.0
+sentencepiece>=0.1.99
+
+# Optional: accelerate for faster inference
+# accelerate>=0.25.0

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Суммаризация отзывов</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Основная область -->
+      <div class="main">
+        <h1 class="page-title">Суммаризатор текста</h1>
+
+        <div class="panels">
+          <!-- Левая панель -->
+          <div class="panel" id="leftPanel">
+            <div id="clearBtn" class="clear-btn hidden" onclick="clearInput()">
+              &times;
+            </div>
+
+            <!-- Ввод текста -->
+            <textarea id="inputText" placeholder="Введите текст для суммаризации..."></textarea>
+
+            <!-- Загрузка файла CSV -->
+            <div
+              class="upload-box hidden"
+              id="uploadBox"
+              onclick="document.getElementById('fileInput').click()"
+            >
+              <div>
+                <div style="font-size: 40px">📄</div>
+                Загрузить файл
+              </div>
+            </div>
+            <input type="file" id="fileInput" class="hidden" accept=".csv" />
+
+            <button id="uploadBtn">Загрузить CSV</button>
+
+            <div class="footer">
+              <span id="inputCount">Слова: 0</span>
+              <button onclick="startProcessing()">Суммаризовать</button>
+            </div>
+          </div>
+
+          <!-- Правая панель -->
+          <div class="panel">
+            <textarea
+              id="outputText"
+              placeholder="Результат суммаризации..."
+              readonly
+            ></textarea>
+
+            <div class="footer">
+              <span id="outputCount">Слова: 0</span>
+              <div>
+                <button onclick="copyResult()">Копировать</button>
+                <button onclick="downloadResult()">Скачать</button>
+              </div>
+            </div>
+
+            <div class="loading" id="loading">
+              <div class="spinner"></div>
+              <span>Загрузка…</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PapaParse для чтения CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- Конфигурация API -->
+    <script src="config.js"></script>
+    <!-- Основной скрипт -->
+    <script src="script.js"></script>
+  </body>
+</html>

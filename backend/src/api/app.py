@@ -1,7 +1,3 @@
-"""
-FastAPI app: подключение роутера, CORS, обработчики исключений, логирование.
-"""
-
 import logging
 
 from fastapi import FastAPI, Request

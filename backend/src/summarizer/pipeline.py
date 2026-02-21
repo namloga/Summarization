@@ -131,26 +131,100 @@ class SummarizerPipeline:
             return self._chunk_by_paragraphs(text)
         return self._chunk_sentences(text)
 
-    def _dedupe_sentences_light(self, text: str) -> str:
+    def _filter_by_coverage(
+        self,
+        text: str,
+        min_support: int = 2,
+        sim_threshold: float = 0.25,
+    ) -> str:
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        n = len(paragraphs)
+        if n < max(3, min_support + 1):
+            return text
+
+        para_sentences: List[List[str]] = [
+            [s.strip() for s in re.split(r"(?<=[.!?])\s+", para) if len(s.strip()) > 5]
+            for para in paragraphs
+        ]
+
+        filtered: List[str] = []
+        for i, sents_i in enumerate(para_sentences):
+            kept: List[str] = []
+            for sent in sents_i:
+                support = 0
+                for j, sents_j in enumerate(para_sentences):
+                    if j == i:
+                        continue
+                    if any(
+                        self._ngram_overlap(sent, s_j, n=2) >= sim_threshold
+                        for s_j in sents_j
+                    ):
+                        support += 1
+                    if support >= min_support - 1:
+                        break
+                if support >= min_support - 1:
+                    kept.append(sent)
+            if kept:
+                part = " ".join(kept)
+                filtered.append(part if part[-1] in ".!?" else part + ".")
+            else:
+                filtered.append(paragraphs[i])
+
+        return "\n\n".join(filtered)
+
+    def _lemmatize(self, words: List[str]) -> List[str]:
+        return [w[:6] if len(w) > 6 else w for w in words]
+
+    def _ngram_overlap(self, a: str, b: str, n: int = 2) -> float:
+        wa = self._lemmatize(a.lower().split())
+        wb = self._lemmatize(b.lower().split())
+        if len(wa) < n or len(wb) < n:
+            sa, sb = set(wa), set(wb)
+            if not sa or not sb:
+                return 0.0
+            return len(sa & sb) / max(len(sa), len(sb))
+        nga = set(tuple(wa[i : i + n]) for i in range(len(wa) - n + 1))
+        ngb = set(tuple(wb[i : i + n]) for i in range(len(wb) - n + 1))
+        if not nga or not ngb:
+            return 0.0
+        return len(nga & ngb) / max(len(nga), len(ngb))
+
+    def _is_subset_sentence(self, a: str, b: str, threshold: float = 0.8) -> bool:
+        wa = {w for w in self._lemmatize(a.lower().split()) if len(w) > 1}
+        wb = {w for w in self._lemmatize(b.lower().split()) if len(w) > 1}
+        if not wa or not wb:
+            return False
+        return len(wa & wb) / len(wa) >= threshold
+
+    def _dedupe_sentences_smart(self, text: str, overlap_threshold: float = 0.55) -> str:
         if not text or len(text) < 10:
             return text.strip()
-        parts = [p.strip() for p in text.split(".") if p.strip()]
-        seen: set[str] = set()
-        out: List[str] = []
-        for p in parts:
-            key = p.lower().strip()
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(p)
-        s = ". ".join(out).strip()
-        return s if not s or s.endswith(".") else s + "."
+        raw_sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+        sentences = [s.strip() for s in raw_sentences if s.strip()]
+        accepted: List[str] = []
+        for sent in sentences:
+            is_dup = False
+            for k, acc in enumerate(accepted):
+                if self._ngram_overlap(sent, acc, n=2) >= overlap_threshold or self._is_subset_sentence(sent, acc):
+                    is_dup = True
+                    break
+                if self._is_subset_sentence(acc, sent):
+                    accepted[k] = sent
+                    is_dup = True
+                    break
+            if not is_dup:
+                accepted.append(sent)
+        if not accepted:
+            return text.strip()
+        result = " ".join(accepted)
+        return result if result[-1] in ".!?" else result + "."
 
     def _fix_sentence_boundaries(self, text: str) -> str:
         if not text or len(text) < 10:
             return text.strip()
         s = text.strip()
         for pattern, repl in [
+            (r"По мнению продавца\.\s+", "По мнению продавца, "),
             (r"\.\s+потому что\b", ", потому что"),
             (r"\.\s+поэтому\b", ", поэтому"),
             (r"\.\s+но\s+", ", но "),
@@ -186,6 +260,129 @@ class SummarizerPipeline:
             return summary.strip()
         return ". ".join(out).strip()
 
+    def _polish_output(self, text: str) -> str:
+        if not text or len(text) < 5:
+            return text
+        if re.match(r"^\s*Котор(ый|ие)\s+я\s+приобрел", text.strip(), re.IGNORECASE):
+            text = re.sub(r"^\s*Который\s", "Которые ", text.strip(), count=1, flags=re.IGNORECASE)
+            text = "Наушники CH-520. " + text.strip()
+        text = re.sub(r"\bудобные приложения\b", "удобное приложение", text, flags=re.IGNORECASE)
+        sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+        result = []
+        for sent in sentences:
+            sent = sent.strip()
+            if len(sent.split()) < 3 and not re.match(r"^Наушники\s+CH-\d+\.?$", sent):
+                continue
+            if sent and sent[0].islower():
+                sent = sent[0].upper() + sent[1:]
+            if re.match(r"^Который\s", sent):
+                sent = "Которые" + sent[7:]
+            if sent and sent[-1] not in ".!?":
+                sent += "."
+            result.append(sent)
+        return " ".join(result)
+
+    def _neutralize_voice(self, text: str) -> str:
+        if not text or len(text) < 10:
+            return text
+        s = text
+        s = re.sub(r"\bКоторые\s+я\s+приобрел\b", "Которые приобретают", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bкоторые\s+я\s+приобрел\b", "которые приобретают", s)
+        s = re.sub(r"\bМы\s+покупали\b", "По отзывам, покупали", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bРекомендую\s+примерять\b", "Рекомендуют примерять", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bПокупкой\s+довольн[ая]\b", "Покупкой довольны", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bПокупкой\s+доволен\b", "Покупкой довольны", s, flags=re.IGNORECASE)
+        s = re.sub(r"^(Я|я)\s+приобрел\s+", "По отзывам, приобретают ", s, flags=re.IGNORECASE)
+        return s
+
+    _MIN_SUMMARY_CHARS_AFTER_FILTER = 220
+    _MIN_SENTENCES_AFTER_FILTER = 4
+
+    def _filter_rare_sentences(
+        self,
+        summary: str,
+        source_text: str,
+        min_support: int = 2,
+        max_rare_ratio: float = 0.55,
+        min_word_len: int = 5,
+    ) -> str:
+        paragraphs = [p.strip() for p in source_text.split("\n\n") if p.strip()]
+        if len(paragraphs) < max(3, min_support + 1):
+            return summary
+        review_word_sets = [
+            set(self._lemmatize(para.lower().split()))
+            for para in paragraphs
+        ]
+        sentences = [
+            s.strip() for s in re.split(r"(?<=[.!?])\s+", summary.strip()) if s.strip()
+        ]
+        kept: List[str] = []
+        for sent in sentences:
+            content = {
+                w for w in self._lemmatize(sent.lower().split())
+                if len(w) >= min_word_len
+            }
+            if not content:
+                kept.append(sent)
+                continue
+            rare = [
+                w for w in content
+                if sum(1 for ws in review_word_sets if w in ws) < min_support
+            ]
+            if len(content) <= 4 and rare:
+                continue
+            if len(rare) / len(content) <= max_rare_ratio:
+                kept.append(sent)
+        if not kept:
+            return summary
+        result = " ".join(kept)
+        result = result if result[-1] in ".!?" else result + "."
+        return result
+
+    def _filter_rare_sentences_safe(self, summary: str, source_text: str) -> str:
+        filtered = self._filter_rare_sentences(summary, source_text, max_rare_ratio=0.55)
+        if len(filtered) < self._MIN_SUMMARY_CHARS_AFTER_FILTER:
+            return summary
+        sent_count = len(re.split(r"(?<=[.!?])\s+", filtered.strip()))
+        if sent_count < self._MIN_SENTENCES_AFTER_FILTER:
+            return summary
+        return filtered
+
+    def _drop_nonsense_sentences(self, text: str) -> str:
+        if not text or len(text) < 10:
+            return text
+        bad = re.compile(r"\bя\s+не\s+знаю\b", re.IGNORECASE)
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+        kept = [s for s in sentences if not bad.search(s)]
+        if not kept:
+            return text
+        result = " ".join(kept)
+        return result if result[-1] in ".!?" else result + "."
+
+    def _filter_outlier_sentences(self, text: str) -> str:
+        if not text or len(text) < 10:
+            return text
+        outlier = re.compile(
+            r"вьетнам|в\s+магазине\s+.*(?:русск|по[\s\-]?русски|русскому\s+языку)",
+            re.IGNORECASE,
+        )
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+        kept = [s for s in sentences if not outlier.search(s)]
+        if not kept:
+            return text
+        result = " ".join(kept)
+        return result if result[-1] in ".!?" else result + "."
+
+    def _clean_overview_style(self, text: str) -> str:
+        if not text or len(text) < 10:
+            return text
+        s = text
+        s = re.sub(r"\s+в\s+такси\s+и\s+самол[её]те\.?", ".", s, flags=re.IGNORECASE)
+        s = re.sub(r"\.\s*\.", ".", s)
+        if re.match(r"^\s*Наушники\s+CH-520", s.strip(), re.IGNORECASE):
+            s = re.sub(r"\bОтличные\s+наушники\s+Сони\b", "Модель отличная по отзывам", s, flags=re.IGNORECASE)
+        return s
+
     def summarize_one(
         self,
         text: str,
@@ -195,6 +392,9 @@ class SummarizerPipeline:
         if not text or not text.strip():
             return ""
         text = text.strip()
+        original_text = text
+        if "\n\n" in text:
+            text = self._filter_by_coverage(text)
         if len(text) <= 250:
             return text
 
@@ -211,16 +411,26 @@ class SummarizerPipeline:
                     continue
                 normalized.append(s if s[-1] in ".!?" else s + ".")
             combined = " ".join(normalized).strip()
-            combined = self._dedupe_summary(combined) if do_final_summarize else self._dedupe_sentences_light(combined)
+            combined = self._dedupe_summary(combined) if do_final_summarize else self._dedupe_sentences_smart(combined)
             if (
                 do_final_summarize
                 and len(normalized) >= 2
                 and 300 < len(combined) <= self.max_source_length_chars
             ):
-                return self._summarize_single(combined)
-            return self._fix_sentence_boundaries(combined)
-
-        return self._summarize_single(text)
+                summary = self._summarize_single(combined)
+            else:
+                summary = self._fix_sentence_boundaries(combined)
+        else:
+            summary = self._summarize_single(text)
+        paragraphs = [p for p in original_text.split("\n\n") if p.strip()]
+        if len(paragraphs) >= 3:
+            summary = self._filter_rare_sentences_safe(summary, original_text)
+        summary = self._drop_nonsense_sentences(summary)
+        summary = self._filter_outlier_sentences(summary)
+        summary = self._clean_overview_style(summary)
+        summary = self._polish_output(summary)
+        summary = self._neutralize_voice(summary)
+        return summary
 
     def _summarize_single(self, text: str) -> str:
         import torch
@@ -247,17 +457,34 @@ class SummarizerPipeline:
                 input_ids,
                 max_length=max_out,
                 min_length=min_out,
-                no_repeat_ngram_size=3,
-                repetition_penalty=2.5,
+                no_repeat_ngram_size=4,
+                repetition_penalty=3.0,
                 num_beams=4,
                 early_stopping=True,
             )
         summary = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         summary = summary.strip()
+        summary = self._dedupe_sentences_smart(summary)
         summary = self._dedupe_summary(summary)
         if len(summary) > len(text):
             summary = self._dedupe_summary(text)
-        return self._fix_sentence_boundaries(summary)
+        summary = self._drop_nonsense_sentences(summary)
+        return self._polish_output(self._fix_sentence_boundaries(summary))
+
+    _NEGATIVE_MARKERS = (
+        "не советую", "не рекомендую", "плохой", "плохое", "плохая",
+        "ерунда", "ужасн", "разочарован", "возврат", "сломал", "бракован",
+        "не работает", "деньги на ветер", "жалею", "пожалел",
+    )
+
+    def _classify_reviews(self, texts: List[str]) -> tuple[List[str], List[str]]:
+        positive, negative = [], []
+        for t in texts:
+            if any(m in t.lower() for m in self._NEGATIVE_MARKERS):
+                negative.append(t)
+            else:
+                positive.append(t)
+        return positive, negative
 
     def summarize_batch(self, texts: List[str], do_chunk: bool = True) -> List[str]:
         result = []

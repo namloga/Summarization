@@ -1,7 +1,3 @@
-"""
-Запуск статического сервера для фронтенда.
-Открыть в браузере: http://localhost:5500
-"""
 import http.server
 import socketserver
 import webbrowser

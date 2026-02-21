@@ -54,6 +54,7 @@ class SummarizeFileResponse(BaseModel):
     summaries: list[SummarizeItemResponse] = Field(..., description="Список сводок по порядку")
     stats: SummarizeFileStats = Field(..., description="Статистика")
     filename: str | None = Field(None, description="Имя загруженного файла (если есть)")
+    structured: dict | None = Field(None, description="Плюсы / Минусы / Итог (если запрошено)")
 
 
 class HealthResponse(BaseModel):
@@ -80,13 +81,11 @@ def _get_pipeline():
 
 @router.get("/health", response_model=HealthResponse)
 def health():
-    """Проверка доступности сервиса."""
     return HealthResponse(status="ok", service="summarization-api", version="1.0.0")
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
 def summarize(body: SummarizeRequest):
-    """Принимает текст или список текстов и возвращает список сводок."""
     texts = body.get_texts()
     if not texts:
         raise HTTPException(
@@ -122,6 +121,7 @@ async def summarize_file(
     file: UploadFile = File(..., description="CSV или JSON файл"),
     combine: bool = Query(True, description="Объединить все отзывы и сделать одну сводку"),
     detail: bool = Query(True, description="True: более подробно; False: короткая сводка"),
+    structured: bool = Query(False, description="Вернуть структуру: Плюсы / Минусы / Итог"),
 ):
     filename = file.filename or "upload"
     ext = Path(filename).suffix.lower()
@@ -201,8 +201,19 @@ async def summarize_file(
         pipeline = _get_pipeline()
         if combine:
             combined = "\n\n".join(texts)
-            logger.info("summarize-file: combine=True, detail=%s, n=%d", detail, total_extracted)
+            logger.info(
+                "summarize-file: combine=True, detail=%s, structured=%s, n=%d",
+                detail, structured, total_extracted,
+            )
             summary = pipeline.summarize_one(combined, do_chunk=True, do_final_summarize=not detail)
+            if total_extracted > 1:
+                pos, neg = pipeline._classify_reviews(texts)
+                if pos and neg and "редкие негативные" not in summary:
+                    summary = summary.rstrip()
+                    if summary and summary[-1] not in ".!?":
+                        summary += "."
+                    summary += "\n\nВстречаются редкие негативные отзывы."
+            structured_result = getattr(pipeline, "summarize_structured", lambda t: None)(texts) if structured else None
             items = [
                 SummarizeItemResponse(summary=summary, original_length=len(combined))
             ]
@@ -215,7 +226,8 @@ async def summarize_file(
                     summarized = 1 if summary else 0,
                     skipped = 0,
                 ),
-                filename=filename,
+                filename = filename,
+                structured = structured_result,
             )
         summaries = pipeline.summarize_batch(texts, do_chunk=True)
         items = [

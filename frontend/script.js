@@ -6,7 +6,6 @@ const uploadBtn = document.getElementById('uploadBtn');
 const fileInput = document.getElementById('fileInput');
 
 const API_BASE = window.API_CONFIG?.BASE_URL || 'http://localhost:8000';
-// Количество отзывов из последнего загруженного CSV (для отображения справа)
 window.lastCsvCount = null;
 
 input.addEventListener('input', () => {
@@ -107,7 +106,6 @@ fileInput.addEventListener('change', function () {
                 if (texts.length) {
                     input.value = texts.join('\n\n');
                     input.dispatchEvent(new Event('input'));
-                    // Сохраняем количество отзывов для отображения в сводке
                     window.lastCsvCount = texts.length;
                 }
             }
